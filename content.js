@@ -205,20 +205,36 @@ function cssEscapeForSelector(value) {
 }
 
 function replaceMenuItemLabel(item, label) {
-  const candidates = Array.from(item.querySelectorAll('span, div'))
-    .filter(el => isVisible(el))
-    .filter(el => {
-      const text = cleanText(el.innerText || el.textContent || '');
-      return text.toLowerCase() === 'reply' || text.length <= 80;
-    })
-    .sort((a, b) => {
-      const at = cleanText(a.innerText || a.textContent || '').toLowerCase();
-      const bt = cleanText(b.innerText || b.textContent || '').toLowerCase();
-      return (bt === 'reply') - (at === 'reply') || area(a) - area(b);
-    });
-  const exact = candidates.find(el => cleanText(el.innerText || el.textContent || '').toLowerCase() === 'reply');
-  const target = exact || candidates[candidates.length - 1] || item;
-  target.textContent = label;
+  // The AI row is cloned from WhatsApp's native Reply button. Keep the cloned
+  // DOM intact and replace only the innermost text node/leaf span that contains
+  // the visible label. Never set item.textContent, because that destroys
+  // WhatsApp's icon/text wrapper structure and makes the row look plain.
+  const wanted = 'reply';
+
+  const leafElements = Array.from(item.querySelectorAll('span, div'))
+    .filter(el => cleanText(el.textContent || '').toLowerCase() === wanted)
+    .filter(el => !Array.from(el.children || []).some(child => cleanText(child.textContent || '')));
+
+  const leafSpan = leafElements.find(el => el.tagName?.toLowerCase() === 'span');
+  const target = leafSpan || leafElements[0];
+  if (target) {
+    target.textContent = label;
+    return;
+  }
+
+  const walker = document.createTreeWalker(item, NodeFilter.SHOW_TEXT);
+  const textNodes = [];
+  while (walker.nextNode()) textNodes.push(walker.currentNode);
+  const replyNode = textNodes.find(node => cleanText(node.nodeValue || '').toLowerCase() === wanted);
+  if (replyNode) {
+    replyNode.nodeValue = label;
+    return;
+  }
+
+  // Last resort: keep the button usable without destroying its structure. This
+  // should be rare, but is safer than wiping all children.
+  item.setAttribute('aria-label', label);
+  item.title = label;
 }
 
 function replaceMenuItemIconWithSparkle(item) {
@@ -252,22 +268,8 @@ function escapeHtml(value) {
 
 async function draftReplyFromMenu(profileId = '') {
   const menu = lastMenuContainer || findOpenWhatsAppMenu();
-  const isGroupMenu = menuLooksLikeGroupMenu(menu);
   const menuMessage = menu ? findMessageNearestMenu(menu) : null;
-  let targetMessage = extractSingleMessage(menuMessage) || extractSingleMessage(lastMenuMessageNode) || extractSingleMessage(lastMessageNode) || getFocusedMenuMessageText() || '';
-
-  // Direct chats are harder than groups because the menu can be rendered far
-  // from the clicked bubble and WhatsApp does not include group-only rows such
-  // as "Reply privately". In that case, if our geometric match points to an
-  // older incoming bubble, prefer the latest visible incoming message. This
-  // matches the common direct-chat flow and avoids replying to stale messages.
-  if (!isGroupMenu) {
-    const latestIncoming = getLatestVisibleIncomingMessage();
-    if (latestIncoming && shouldPreferLatestDirectMessage(targetMessage, latestIncoming)) {
-      targetMessage = latestIncoming;
-    }
-  }
-
+  const targetMessage = extractSingleMessage(menuMessage) || extractSingleMessage(lastMenuMessageNode) || extractSingleMessage(lastMessageNode) || getFocusedMenuMessageText() || '';
   const context = readWhatsAppContext();
   const messageText = targetMessage || context.selectedText || context.recentMessages || context.pageText || '';
 
@@ -328,54 +330,6 @@ function activateNativeReplyIfPossible(menu) {
     return false;
   }
 }
-function menuLooksLikeGroupMenu(menu) {
-  if (!menu) return false;
-  const text = cleanText(menu.innerText || menu.textContent || '');
-  return /(^|\n)Reply privately(\n|$)/i.test(text) || /(^|\n)Message \+?\d/i.test(text);
-}
-
-function shouldPreferLatestDirectMessage(candidate, latestIncoming) {
-  const c = cleanText(candidate || '');
-  const l = cleanText(latestIncoming || '');
-  if (!l) return false;
-  if (!c) return true;
-  if (c === l || c.includes(l) || l.includes(c)) return false;
-
-  const cTime = extractMessageTimeMs(c);
-  const lTime = extractMessageTimeMs(l);
-  // If the latest incoming message is newer, prefer it in direct chats.
-  if (Number.isFinite(cTime) && Number.isFinite(lTime) && lTime > cTime) return true;
-
-  // If timestamps are unavailable, avoid using a stale geometric candidate
-  // when the latest incoming line is present in the recent context.
-  return !Number.isFinite(cTime) || !Number.isFinite(lTime);
-}
-
-function extractMessageTimeMs(message) {
-  const match = String(message || '').match(/^\[(\d{1,2}):(\d{2}),\s*(\d{1,2})\/(\d{1,2})\/(\d{4})\]/);
-  if (!match) return NaN;
-  const [, hh, mm, dd, mo, yyyy] = match.map(Number);
-  return new Date(yyyy, mo - 1, dd, hh, mm).getTime();
-}
-
-function getLatestVisibleIncomingMessage() {
-  const messages = visibleMessageNodesDetailed();
-  const incoming = messages.filter(item => item.incoming && item.text);
-  return incoming.length ? incoming[incoming.length - 1].text : '';
-}
-
-function visibleMessageNodesDetailed() {
-  return visibleMessageNodes().map(node => {
-    const wrapper = node.closest?.('.message-in, .message-out') || node;
-    return {
-      node,
-      incoming: wrapper.classList?.contains('message-in') || !wrapper.classList?.contains('message-out'),
-      outgoing: wrapper.classList?.contains('message-out'),
-      text: extractSingleMessage(node)
-    };
-  });
-}
-
 
 function findMenuItemByText(root, text) {
   if (!root) return null;

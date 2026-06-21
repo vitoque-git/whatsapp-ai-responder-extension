@@ -1,5 +1,7 @@
 # WhatsApp AI Responder
 
+Current version: 0.6.6
+
 A Chrome Manifest V3 extension that adds AI-assisted reply drafting to WhatsApp Web message menus.
 
 It is designed as a drafting assistant, not an auto-sender: generated replies are inserted into the WhatsApp composer for human review before sending.
@@ -8,7 +10,7 @@ It is designed as a drafting assistant, not an auto-sender: generated replies ar
 
 - Adds `Draft using <profile>` items to WhatsApp Web message menus
 - Supports multiple matching profiles for the same chat
-- Empty chat-title match means a profile matches all chats
+- Generic profiles can match all chats, while specific profiles can match one or more chat-title substrings
 - Per-profile prompt and Markdown context
 - Per-profile provider/model selection
 - Provider support:
@@ -35,3 +37,23 @@ For local testing, provider API keys are stored in Chrome local extension storag
 ## Repository description
 
 AI-assisted WhatsApp Web reply drafter with per-chat prompts, Markdown context, multiple providers, and local debug history.
+
+
+## Debugging
+
+Options includes a local debug history. Each entry shows the profile used and has **Copy JSON** so you can copy the exact selected message, recent messages, prompts, provider/model, response, and errors when reporting an issue.
+
+## Notes on WhatsApp menus
+
+WhatsApp Web changes its menu HTML frequently. This extension inserts WhatsApp-like menu rows and resolves the target message by comparing the open menu position with visible messages, then falls back to the last clicked message.
+
+
+## 0.6.6
+
+Fixes a content-script syntax error that prevented WhatsApp Web from being read, restores menu injection, adds contact matching, user identity names, and popup debug logging.
+
+
+## 0.6.6
+
+- Improves direct-chat support by detecting smaller WhatsApp message menus and activating WhatsApp's native Reply immediately before generating the draft.
+- Relaxes message-menu detection so direct chats and media/text menus without group-only rows can still show AI profile actions.
