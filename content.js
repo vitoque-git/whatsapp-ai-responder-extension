@@ -252,8 +252,22 @@ function escapeHtml(value) {
 
 async function draftReplyFromMenu(profileId = '') {
   const menu = lastMenuContainer || findOpenWhatsAppMenu();
+  const isGroupMenu = menuLooksLikeGroupMenu(menu);
   const menuMessage = menu ? findMessageNearestMenu(menu) : null;
-  const targetMessage = extractSingleMessage(menuMessage) || extractSingleMessage(lastMenuMessageNode) || extractSingleMessage(lastMessageNode) || getFocusedMenuMessageText() || '';
+  let targetMessage = extractSingleMessage(menuMessage) || extractSingleMessage(lastMenuMessageNode) || extractSingleMessage(lastMessageNode) || getFocusedMenuMessageText() || '';
+
+  // Direct chats are harder than groups because the menu can be rendered far
+  // from the clicked bubble and WhatsApp does not include group-only rows such
+  // as "Reply privately". In that case, if our geometric match points to an
+  // older incoming bubble, prefer the latest visible incoming message. This
+  // matches the common direct-chat flow and avoids replying to stale messages.
+  if (!isGroupMenu) {
+    const latestIncoming = getLatestVisibleIncomingMessage();
+    if (latestIncoming && shouldPreferLatestDirectMessage(targetMessage, latestIncoming)) {
+      targetMessage = latestIncoming;
+    }
+  }
+
   const context = readWhatsAppContext();
   const messageText = targetMessage || context.selectedText || context.recentMessages || context.pageText || '';
 
@@ -314,6 +328,54 @@ function activateNativeReplyIfPossible(menu) {
     return false;
   }
 }
+function menuLooksLikeGroupMenu(menu) {
+  if (!menu) return false;
+  const text = cleanText(menu.innerText || menu.textContent || '');
+  return /(^|\n)Reply privately(\n|$)/i.test(text) || /(^|\n)Message \+?\d/i.test(text);
+}
+
+function shouldPreferLatestDirectMessage(candidate, latestIncoming) {
+  const c = cleanText(candidate || '');
+  const l = cleanText(latestIncoming || '');
+  if (!l) return false;
+  if (!c) return true;
+  if (c === l || c.includes(l) || l.includes(c)) return false;
+
+  const cTime = extractMessageTimeMs(c);
+  const lTime = extractMessageTimeMs(l);
+  // If the latest incoming message is newer, prefer it in direct chats.
+  if (Number.isFinite(cTime) && Number.isFinite(lTime) && lTime > cTime) return true;
+
+  // If timestamps are unavailable, avoid using a stale geometric candidate
+  // when the latest incoming line is present in the recent context.
+  return !Number.isFinite(cTime) || !Number.isFinite(lTime);
+}
+
+function extractMessageTimeMs(message) {
+  const match = String(message || '').match(/^\[(\d{1,2}):(\d{2}),\s*(\d{1,2})\/(\d{1,2})\/(\d{4})\]/);
+  if (!match) return NaN;
+  const [, hh, mm, dd, mo, yyyy] = match.map(Number);
+  return new Date(yyyy, mo - 1, dd, hh, mm).getTime();
+}
+
+function getLatestVisibleIncomingMessage() {
+  const messages = visibleMessageNodesDetailed();
+  const incoming = messages.filter(item => item.incoming && item.text);
+  return incoming.length ? incoming[incoming.length - 1].text : '';
+}
+
+function visibleMessageNodesDetailed() {
+  return visibleMessageNodes().map(node => {
+    const wrapper = node.closest?.('.message-in, .message-out') || node;
+    return {
+      node,
+      incoming: wrapper.classList?.contains('message-in') || !wrapper.classList?.contains('message-out'),
+      outgoing: wrapper.classList?.contains('message-out'),
+      text: extractSingleMessage(node)
+    };
+  });
+}
+
 
 function findMenuItemByText(root, text) {
   if (!root) return null;

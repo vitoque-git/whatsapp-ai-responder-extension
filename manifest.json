@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "WhatsApp AI Responder",
   "description": "Draft AI-assisted WhatsApp Web replies from message menus using chat-specific prompts and Markdown context.",
-  "version": "0.6.5",
+  "version": "0.6.7",
   "permissions": [
     "activeTab",
     "storage",
