@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>WhatsApp AI Responder</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <h1>WhatsApp AI Responder</h1>
+    <div id="chatTitle" class="muted">Chat: loading…</div>
+    <button id="createProfileForChat" class="secondary" disabled>Create a profile for this group</button>
+    <div id="status" class="status">Loading…</div>
+
+    <label>Profile</label>
+    <select id="profile"></select>
+
+    <label>Message/context to answer</label>
+    <textarea id="context" rows="8" placeholder="Select text in WhatsApp, or let the extension read recent visible messages from the active chat."></textarea>
+
+    <label>Extra instruction</label>
+    <input id="instruction" value="Draft a reply. Keep it concise. Do not send it." />
+
+    <button id="generate">Generate draft</button>
+
+    <label>Draft</label>
+    <textarea id="draft" rows="8" placeholder="Draft will appear here."></textarea>
+
+    <div class="row">
+      <button id="copy">Copy</button>
+      <button id="insert">Insert into WhatsApp</button>
+      <button id="options">Options</button>
+    </div>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

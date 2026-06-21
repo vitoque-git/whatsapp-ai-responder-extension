@@ -1,0 +1,107 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>WhatsApp AI Responder Options</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main>
+    <h1>WhatsApp AI Responder Options</h1>
+
+    <section>
+      <h2>AI providers</h2>
+      <p class="note">Add one or more provider keys. Each profile can choose its own provider and model.</p>
+
+      <label>Groq API key</label>
+      <input id="groqApiKey" type="password" placeholder="gsk_..." autocomplete="off" />
+
+      <label>OpenAI API key</label>
+      <input id="openaiApiKey" type="password" placeholder="sk-..." autocomplete="off" />
+
+      <label>Claude / Anthropic API key</label>
+      <input id="claudeApiKey" type="password" placeholder="sk-ant-..." autocomplete="off" />
+
+      <div class="row">
+        <button id="refreshModels" type="button">Refresh all model lists</button>
+      </div>
+      <p class="note" id="modelStatus">Model lists use the configured provider keys. Fallback model IDs are available if refresh fails.</p>
+      <p class="note">For local testing this stores keys in Chrome local extension storage. For real use, put keys behind your own backend proxy.</p>
+    </section>
+
+    <section>
+      <h2>User identity</h2>
+      <p class="note">Names that WhatsApp may use for your own messages. This helps the prompt avoid replying as the wrong person.</p>
+      <label>My WhatsApp name(s)</label>
+      <textarea id="myNames" rows="3" placeholder="One per line, e.g.&#10;You&#10;Vito"></textarea>
+    </section>
+
+    <section>
+      <h2>Profiles</h2>
+      <div class="row">
+        <select id="profiles"></select>
+        <button id="newProfile">New</button>
+        <button id="deleteProfile">Delete</button>
+      </div>
+
+      <label>Name</label>
+      <input id="name" />
+
+      <label class="checkbox"><input id="isGeneric" type="checkbox" /> Generic profile (matches all chats)</label>
+
+      <label>WhatsApp chat title match substrings</label>
+      <p class="note">Add one or more chat title snippets. Specific matching profiles appear before generic profiles in the WhatsApp menu.</p>
+      <div class="row">
+        <select id="matchTexts" size="4"></select>
+        <div class="stacked-buttons">
+          <input id="newMatchText" placeholder="Chat title contains..." />
+          <button id="addMatchText" type="button">Add</button>
+          <button id="removeMatchText" type="button">Remove selected</button>
+        </div>
+      </div>
+
+      <label>WhatsApp contact/direct chat match substrings</label>
+      <p class="note">Optional: add one or more contact names or phone-number snippets for direct chats. These are checked in addition to chat titles.</p>
+      <div class="row">
+        <select id="matchContacts" size="4"></select>
+        <div class="stacked-buttons">
+          <input id="newMatchContact" placeholder="Contact name or number contains..." />
+          <button id="addMatchContact" type="button">Add</button>
+          <button id="removeMatchContact" type="button">Remove selected</button>
+        </div>
+      </div>
+
+      <label>Provider</label>
+      <select id="profileProvider">
+        <option value="groq">Groq</option>
+        <option value="openai">OpenAI</option>
+        <option value="claude">Claude</option>
+      </select>
+
+      <label>Model</label>
+      <select id="profileModel"></select>
+
+      <label>Pre-prompt</label>
+      <textarea id="systemPrompt" rows="7"></textarea>
+
+      <label>Markdown context</label>
+      <textarea id="markdown" rows="14"></textarea>
+    </section>
+
+    <section>
+      <h2>Debug history</h2>
+      <label class="checkbox"><input id="debugEnabled" type="checkbox" /> Save prompt/reply debug history locally</label>
+      <div class="row">
+        <button id="reloadDebug" type="button">Reload history</button>
+        <button id="clearDebug" type="button">Clear history</button>
+      </div>
+      <p class="note">Use this to inspect the exact system prompt, user prompt, selected message, model, and provider response. It is stored only in Chrome local extension storage.</p>
+      <div id="debugHistory"></div>
+    </section>
+
+    <button id="save">Save</button>
+    <div id="status"></div>
+  </main>
+  <script src="options.js"></script>
+</body>
+</html>
