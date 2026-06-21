@@ -271,18 +271,27 @@ async function draftReplyFromMenu(profileId = '') {
   const menuMessage = menu ? findMessageNearestMenu(menu) : null;
   const targetMessage = extractSingleMessage(menuMessage) || extractSingleMessage(lastMenuMessageNode) || extractSingleMessage(lastMessageNode) || getFocusedMenuMessageText() || '';
   const context = readWhatsAppContext();
-  const messageText = targetMessage || context.selectedText || context.recentMessages || context.pageText || '';
-
-  if (!messageText.trim()) {
-    showToast('No message detected. Click the message menu again.', true);
-    return;
-  }
 
   // Click WhatsApp's native Reply immediately, while the original menu is still
   // open. This is more reliable in direct chats, where the menu may close or
   // re-render during the AI request. It also lets WhatsApp itself bind the
   // reply preview to the exact message selected by the user.
   const replyActivated = activateNativeReplyIfPossible(menu);
+  if (replyActivated) await wait(100);
+
+  // In direct chats WhatsApp's small message menu can be positioned far enough
+  // from the bubble that coordinate-based detection may pick an older nearby
+  // message. After native Reply is activated, WhatsApp renders a quoted-reply
+  // preview for the exact message the user selected; prefer that preview when
+  // available and use DOM/pointer detection only as a fallback.
+  const replyPreviewMessage = replyActivated ? getActiveReplyPreviewMessageText() : '';
+  const messageText = replyPreviewMessage || targetMessage || context.selectedText || context.recentMessages || context.pageText || '';
+
+  if (!messageText.trim()) {
+    showToast('No message detected. Click the message menu again.', true);
+    return;
+  }
+
   showToast(replyActivated ? 'Generating AI draft…' : 'Generating AI draft. Could not activate WhatsApp Reply yet…');
 
   try {
@@ -306,6 +315,55 @@ async function draftReplyFromMenu(profileId = '') {
   } catch (e) {
     showToast(e.message || String(e), true);
   }
+}
+
+
+function getActiveReplyPreviewMessageText() {
+  const footer = document.querySelector('#main footer') || document.querySelector('footer');
+  if (!footer) return '';
+
+  const selectorMatches = Array.from(footer.querySelectorAll([
+    '[data-testid*="quoted" i]',
+    '[data-testid*="reply" i]',
+    '[aria-label*="quoted" i]',
+    '[aria-label*="reply" i]'
+  ].join(',')))
+    .filter(isVisible)
+    .map(extractReplyPreviewTextFromNode)
+    .filter(Boolean);
+  if (selectorMatches.length) return selectorMatches[0];
+
+  const composer = findWhatsAppComposer();
+  const composerRect = composer?.getBoundingClientRect?.();
+  const candidates = Array.from(footer.querySelectorAll('div, span'))
+    .filter(el => isVisible(el) && !el.closest('[contenteditable="true"]') && !el.querySelector('[contenteditable="true"]'))
+    .filter(el => {
+      if (el.closest('button, [role="button"]')) return false;
+      const text = cleanText(el.innerText || el.textContent || '');
+      if (text.length < 2 || text.length > 700) return false;
+      if (/^(type a message|message|emoji|attach|send|voice message)$/i.test(text)) return false;
+
+      // Quoted previews sit just above the composer in the footer. Avoid
+      // unrelated header/sidebar text if WhatsApp changes the surrounding DOM.
+      if (composerRect) {
+        const rect = el.getBoundingClientRect();
+        if (rect.bottom < composerRect.top - 140 || rect.top > composerRect.bottom) return false;
+      }
+      return true;
+    })
+    .map(extractReplyPreviewTextFromNode)
+    .filter(Boolean);
+
+  candidates.sort((a, b) => b.length - a.length);
+  return candidates[0] || '';
+}
+
+function extractReplyPreviewTextFromNode(node) {
+  const text = cleanMessageText(node?.innerText || node?.textContent || '');
+  if (!text) return '';
+  const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
+  const useful = lines.filter(line => !/^(you|reply|close|cancel)$/i.test(line));
+  return (useful.length ? useful : lines).join('\n').trim();
 }
 
 function pickProfile(profiles, chatTitle) {
